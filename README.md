@@ -120,7 +120,7 @@ sudo dnf group install -y development-tools
 This installs the extra apps. Workstation already ships GNOME Shell, Nautilus, Ptyxis, GNOME Text Editor, and PipeWire, so those are not listed. `nss-mdns` below covers `.local` discovery (it pulls in Avahi itself). Niche extras are left out; install them from GNOME Software when you need them.
 
 ```bash
-sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper python3-dnf-plugin-snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli earlyoom zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
+sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper python3-dnf-plugin-snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli earlyoom zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
 ```
 
 ## Battery charge limit (60%) [ASUS-only]
@@ -241,10 +241,14 @@ mkdir -p ~/.config/autostart && cp -f /usr/share/applications/org.gnome.Software
 gsettings set org.gnome.desktop.search-providers disabled "['org.gnome.Software.desktop']"
 ```
 
-Enable tray icons for legacy apps (AppIndicator, installed with the apps above):
+Enable the extensions installed above (AppIndicator for tray icons, Dash to Dock):
 
 ```bash
 gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
+```
+
+```bash
+gnome-extensions enable dash-to-dock@micxgx.gmail.com
 ```
 
 ## Fonts
