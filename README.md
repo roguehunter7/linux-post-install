@@ -253,11 +253,13 @@ gnome-extensions enable dash-to-dock@micxgx.gmail.com
 
 ## [Optional] Extensions (catalog)
 
-These two aren't in the Fedora repos; install them from extensions.gnome.org (both support GNOME 50), then enable them. Log out and back in if they don't appear.
+These two aren't in the Fedora repos. Install them from extensions.gnome.org with the Extensions app — it checks GNOME version compatibility and handles updates:
 
 ```bash
-for uuid in clipboard-history@alexsaveau.dev bluetooth-quick-connect@bjarosze.gmail.com; do url=$(curl -fsSL "https://extensions.gnome.org/extension-info/?uuid=$uuid" | python3 -c 'import json,sys;print(json.load(sys.stdin)["download_url"])'); curl -fsSL "https://extensions.gnome.org$url" -o "/tmp/$uuid.zip" && gnome-extensions install --force "/tmp/$uuid.zip"; done
+sudo dnf install -y gnome-extensions-app
 ```
+
+Open it, search for **Clipboard History** and **Bluetooth Quick Connect**, install them, and toggle them on. (Log out and back in if they don't appear.) Or enable them from a terminal:
 
 ```bash
 gnome-extensions enable clipboard-history@alexsaveau.dev
