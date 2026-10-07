@@ -79,8 +79,18 @@ If you play 32-bit Steam/Wine games, add the i686 freeworld packages too:
 sudo dnf install -y mesa-va-drivers-freeworld.i686
 ```
 
+## [Optional] Gaming (Steam)
+
+Steam comes from RPM Fusion (already enabled). Installing it pulls in `ntsync-autoload` — which loads the kernel's NTSYNC module at boot, used automatically by Wine 11 / Proton — plus `gamemode` and the 32-bit bits, as weak dependencies:
+
 ```bash
-sudo dnf swap mesa-vulkan-drivers.i686 mesa-vulkan-drivers-freeworld.i686 || sudo dnf install -y mesa-vulkan-drivers-freeworld.i686
+sudo dnf install -y steam
+```
+
+Reboot (or run `sudo modprobe ntsync`) and `/dev/ntsync` will exist. Steam only pulls `ntsync-autoload` through *weak* dependencies, so if anything was installed with `--setopt=install_weak_deps=False`, add it explicitly:
+
+```bash
+sudo dnf install -y ntsync-autoload
 ```
 
 ## Firmware
