@@ -321,12 +321,6 @@ earlyoom instead of systemd-oomd (this guide sets `vm.swappiness=180`, which kee
 printf 'EARLYOOM_ARGS="-m 5 -s 10 -r 60 --avoid '"'"'(^|/)(init|systemd|gdm|gdm-wayland-session|gnome-shell|Xwayland|pipewire|wireplumber)$'"'"' --prefer '"'"'(^|/)(Web Content|firefox|chrome|electron)$'"'"'"\n' | sudo tee /etc/default/earlyoom >/dev/null && sudo systemctl disable --now systemd-oomd.service; sudo systemctl enable earlyoom.service
 ```
 
-SMART monitoring on every capable device:
-
-```bash
-printf '# Scan every SMART-capable device\nDEVICESCAN -a\n' | sudo tee /etc/smartd.conf >/dev/null
-```
-
 Skip the boot-delaying waiter:
 
 ```bash
