@@ -136,7 +136,7 @@ sudo dnf group install -y development-tools
 This installs the extra apps. Workstation already ships GNOME Shell, Nautilus, Ptyxis, GNOME Text Editor, and PipeWire, so those are not listed. `nss-mdns` below covers `.local` discovery (it pulls in Avahi itself). Niche extras are left out; install them from GNOME Software when you need them.
 
 ```bash
-sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli earlyoom zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
+sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
 ```
 
 ## Battery charge limit (60%) [ASUS-only]
@@ -325,12 +325,6 @@ Kernel and memory sysctls (aggressive swap into zram, Proton map count, inotify 
 sudo mkdir -p /etc/sysctl.d && printf 'vm.swappiness = 180\nvm.page-cluster = 0\nvm.watermark_boost_factor = 0\nvm.watermark_scale_factor = 125\nvm.max_map_count = 1048576\nvm.vfs_cache_pressure = 50\nfs.inotify.max_user_watches = 524288\nfs.inotify.max_user_instances = 8192\n' | sudo tee /etc/sysctl.d/99-performance.conf >/dev/null && sudo sysctl --system
 ```
 
-earlyoom instead of systemd-oomd (this guide sets `vm.swappiness=180`, which keeps zram full — and oomd kills at 90% swap used, so oomd would fire constantly while earlyoom picks better victims):
-
-```bash
-printf 'EARLYOOM_ARGS="-m 5 -s 10 -r 60 --avoid '"'"'(^|/)(init|systemd|gdm|gdm-wayland-session|gnome-shell|Xwayland|pipewire|wireplumber)$'"'"' --prefer '"'"'(^|/)(Web Content|firefox|chrome|electron)$'"'"'"\n' | sudo tee /etc/default/earlyoom >/dev/null && sudo systemctl disable --now systemd-oomd.service; sudo systemctl enable earlyoom.service
-```
-
 Skip the boot-delaying waiter:
 
 ```bash
@@ -402,7 +396,7 @@ echo 'Defaults pwfeedback' | sudo tee /etc/sudoers.d/pwfeedback >/dev/null && su
 Enable everything in one go (the rest — display manager, NetworkManager, firewalld, Bluetooth, printing, trim, smartd, Avahi — ships enabled):
 
 ```bash
-sudo systemctl enable earlyoom.service snapper-timeline.timer snapper-cleanup.timer btrfs-scrub.timer fwupd-refresh.timer
+sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer btrfs-scrub.timer fwupd-refresh.timer
 ```
 
 ```bash
