@@ -6,16 +6,16 @@ Run top to bottom. Each block is copy-paste into a terminal. Reboot where told. 
 
 ## DNF tuning
 
-Speed up dnf before the first upgrade (10 parallel downloads, fastest mirror, assume yes):
+Speed up dnf before the first upgrade (10 parallel downloads, assume yes):
 
 ```bash
-sudo dnf config-manager setopt max_parallel_downloads=10 fastestmirror=True defaultyes=True
+sudo dnf config-manager setopt max_parallel_downloads=10 defaultyes=True
 ```
 
-Check it (should print `10`, `True`, `True`):
+Check it (should print `max_parallel_downloads = 10` and `defaultyes = 1`):
 
 ```bash
-dnf config-manager show max_parallel_downloads fastestmirror defaultyes
+dnf --dump-main-config | grep -E '^(max_parallel_downloads|defaultyes)'
 ```
 
 ## Update
