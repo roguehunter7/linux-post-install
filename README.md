@@ -1,6 +1,6 @@
-# Fedora KDE Post Install Guide
+# Fedora Workstation (GNOME) Post Install Guide
 
-Things to do after installing the Fedora KDE Plasma Desktop Edition. Written for an ASUS VivoBook X409DA (AMD Ryzen 5 3500U / Vega 8, NVMe, Btrfs); most steps suit any Fedora KDE machine.
+Things to do after installing Fedora Workstation (GNOME). Written for an ASUS VivoBook X409DA (AMD Ryzen 5 3500U / Vega 8, NVMe, Btrfs); most steps suit any Fedora GNOME machine.
 
 Run top to bottom. Each block is copy-paste into a terminal. Reboot where told. Graphics, session, and kernel changes need it.
 
@@ -39,7 +39,7 @@ sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-releas
 sudo dnf upgrade --refresh -y
 ```
 
-Show RPMFusion apps in Discover:
+Show RPM Fusion apps in GNOME Software:
 
 ```bash
 sudo dnf update @core
@@ -117,10 +117,10 @@ Compilers and build tools as a group:
 sudo dnf group install -y development-tools
 ```
 
-This installs the extra apps. The spin already ships Plasma, KWin, Dolphin, Konsole, and PipeWire, so those are not listed. (`kio-zeroconf` has no Fedora build, so it is omitted. `nss-mdns` in the list below covers `.local` discovery (it pulls in Avahi itself). Niche extras from the old script (KRfb, Skanlite, Haruna, Rust toolchain, JACK, `kfind`, KColorChooser and friends) are left out. Install them from Discover when you need them.)
+This installs the extra apps. Workstation already ships GNOME Shell, Nautilus, Ptyxis, GNOME Text Editor, and PipeWire, so those are not listed. `nss-mdns` below covers `.local` discovery (it pulls in Avahi itself). Niche extras are left out; install them from GNOME Software when you need them.
 
 ```bash
-sudo dnf install -y gwenview spectacle ark kdegraphics-thumbnailers ffmpegthumbs kf6-kimageformats kio-extras dolphin-plugins plasma-systemmonitor plasma-print-manager kinfocenter plasma-disks ksshaskpass filelight okular kde-partitionmanager kclock python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper python3-dnf-plugin-snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli earlyoom zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
+sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper python3-dnf-plugin-snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli earlyoom zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
 ```
 
 ## Battery charge limit (60%) [ASUS-only]
@@ -211,43 +211,41 @@ curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
 export PATH="$HOME/.local/share/fnm:$PATH" && eval "$(fnm env --shell bash)" && fnm install --latest && fnm default $(fnm ls | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
 ```
 
-## KDE polish
+## GNOME polish
 
-Dark Breeze, empty session on login, double animation speed, Super+Space for KRunner:
+Dark theme, volume overamplification (up to 150%), three window buttons, two-finger touchpad scrolling, and quietening GNOME Software:
 
 ```bash
-kwriteconfig6 --file kdeglobals --group General --key ColorScheme BreezeDark
+gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 ```
 
 ```bash
-kwriteconfig6 --file kdeglobals --group KDE --key LookAndFeelPackage org.kde.breezedark.desktop
+gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true
 ```
 
 ```bash
-kwriteconfig6 --file ksmserverrc --group General --key loginMode emptySession
+gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
 ```
 
 ```bash
-kwriteconfig6 --file kdeglobals --group KDE --key AnimationDurationFactor 0.5
+gsettings set org.gnome.desktop.peripherals.touchpad two-finger-scrolling-enabled true
+```
+
+Stop GNOME Software's background autostart and search provider [Optional — you lose background update checks; GNOME Software still updates when you open it]:
+
+```bash
+mkdir -p ~/.config/autostart && cp -f /usr/share/applications/org.gnome.Software.desktop ~/.config/autostart/ && echo 'X-GNOME-Autostart-enabled=false' >> ~/.config/autostart/org.gnome.Software.desktop
 ```
 
 ```bash
-kwriteconfig6 --file kglobalshortcutsrc --group krunner.desktop --key _launch 'Alt+Space	Alt+F2,Meta+Space	Alt+Space	Alt+F2,KRunner'
+gsettings set org.gnome.desktop.search-providers disabled "['org.gnome.Software.desktop']"
 ```
 
-Disable the Baloo file indexer [Optional — breaks file search in Dolphin/KRunner]:
+Enable tray icons for legacy apps (AppIndicator, installed with the apps above):
 
 ```bash
-mkdir -p ~/.config && printf '[Basic Settings]\nIndexing-Enabled=false\n' | tee ~/.config/baloofilerc >/dev/null && sudo mkdir -p /etc/xdg && printf '[Basic Settings]\nIndexing-Enabled=false\n' | sudo tee /etc/xdg/baloofilerc >/dev/null
+gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
 ```
-
-Stop KClock's daemon from autostarting [Optional — alarms then only fire while KClock is open]:
-
-```bash
-[ -f /etc/xdg/autostart/org.kde.kclockd-autostart.desktop ] && mkdir -p ~/.config/autostart && printf '[Desktop Entry]\nHidden=true\n' > ~/.config/autostart/org.kde.kclockd-autostart.desktop
-```
-
-Fedora uses `plasmalogin`, not SDDM, so there is no greeter config to write.
 
 ## Fonts
 
@@ -306,7 +304,7 @@ sudo mkdir -p /etc/sysctl.d && printf 'vm.swappiness = 180\nvm.page-cluster = 0\
 earlyoom instead of systemd-oomd (this guide sets `vm.swappiness=180`, which keeps zram full — and oomd kills at 90% swap used, so oomd would fire constantly while earlyoom picks better victims):
 
 ```bash
-printf 'EARLYOOM_ARGS="-m 5 -s 10 -r 60 --avoid '"'"'(^|/)(init|systemd|sddm|kwin_wayland|kwin|Xwayland|pipewire|wireplumber)$'"'"' --prefer '"'"'(^|/)(Web Content|firefox|chrome|electron)$'"'"'"\n' | sudo tee /etc/default/earlyoom >/dev/null && sudo systemctl disable --now systemd-oomd.service; sudo systemctl enable earlyoom.service
+printf 'EARLYOOM_ARGS="-m 5 -s 10 -r 60 --avoid '"'"'(^|/)(init|systemd|gdm|gdm-wayland-session|gnome-shell|Xwayland|pipewire|wireplumber)$'"'"' --prefer '"'"'(^|/)(Web Content|firefox|chrome|electron)$'"'"'"\n' | sudo tee /etc/default/earlyoom >/dev/null && sudo systemctl disable --now systemd-oomd.service; sudo systemctl enable earlyoom.service
 ```
 
 SMART monitoring on every capable device:
