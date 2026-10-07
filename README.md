@@ -486,7 +486,7 @@ sudo dnf history rollback
 ```
 
 ```bash
-sudo dnf downgrade <pkg>-<ver>
+sudo dnf downgrade '<pkg>-<ver>'
 ```
 
 **Hibernation is not configured** — swap is zram only.
