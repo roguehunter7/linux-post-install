@@ -73,6 +73,16 @@ sudo dnf install -y mesa-va-drivers-freeworld
 sudo dnf swap mesa-vulkan-drivers mesa-vulkan-drivers-freeworld || sudo dnf install -y mesa-vulkan-drivers-freeworld
 ```
 
+If you play 32-bit Steam/Wine games, add the i686 freeworld packages too:
+
+```bash
+sudo dnf install -y mesa-va-drivers-freeworld.i686
+```
+
+```bash
+sudo dnf swap mesa-vulkan-drivers.i686 mesa-vulkan-drivers-freeworld.i686 || sudo dnf install -y mesa-vulkan-drivers-freeworld.i686
+```
+
 ## Firmware
 
 If your system supports firmware delivery through LVFS:
