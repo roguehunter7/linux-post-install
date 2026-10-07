@@ -42,11 +42,7 @@ sudo dnf upgrade --refresh -y
 Show RPM Fusion apps in GNOME Software:
 
 ```bash
-sudo dnf update @core
-```
-
-```bash
-sudo dnf install rpmfusion-*-appstream-data
+sudo dnf install 'rpmfusion-*-appstream-data'
 ```
 
 Enable the Cisco OpenH264 repo (Firefox uses it for WebRTC calls):
@@ -70,7 +66,7 @@ sudo dnf install @multimedia --setopt="install_weak_deps=False" --exclude=Packag
 AMD hardware decode (H.264/H.265/VC-1 on this Vega 8 — stock Mesa leaves these out):
 
 ```bash
-sudo dnf swap mesa-va-drivers mesa-va-drivers-freeworld || sudo dnf install -y mesa-va-drivers-freeworld
+sudo dnf install -y mesa-va-drivers-freeworld
 ```
 
 ```bash
@@ -120,7 +116,7 @@ sudo dnf group install -y development-tools
 This installs the extra apps. Workstation already ships GNOME Shell, Nautilus, Ptyxis, GNOME Text Editor, and PipeWire, so those are not listed. `nss-mdns` below covers `.local` discovery (it pulls in Avahi itself). Niche extras are left out; install them from GNOME Software when you need them.
 
 ```bash
-sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper python3-dnf-plugin-snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli earlyoom zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
+sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli earlyoom zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
 ```
 
 ## Battery charge limit (60%) [ASUS-only]
@@ -231,10 +227,10 @@ gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,m
 gsettings set org.gnome.desktop.peripherals.touchpad two-finger-scrolling-enabled true
 ```
 
-Stop GNOME Software's background autostart and search provider [Optional — you lose background update checks; GNOME Software still updates when you open it]:
+Stop GNOME Software's background updates and search provider [Optional — you lose background updates; GNOME Software still updates when you open it]:
 
 ```bash
-mkdir -p ~/.config/autostart && cp -f /usr/share/applications/org.gnome.Software.desktop ~/.config/autostart/ && echo 'X-GNOME-Autostart-enabled=false' >> ~/.config/autostart/org.gnome.Software.desktop
+systemctl --user mask gnome-software.service
 ```
 
 ```bash
@@ -367,7 +363,7 @@ sudo findmnt --verify
 
 ## Snapshots
 
-Snapper takes pre/post snapshots of `/` on every dnf transaction (via `python3-dnf-plugin-snapper`, installed above). Create the configs if the installer didn't:
+Snapper takes timeline snapshots (via `snapper-timeline.timer`, enabled below). Note: Fedora 44's default `dnf` is dnf5, which cannot load the dnf4 `python3-dnf-plugin-snapper`, so there are **no automatic pre/post snapshots** on dnf transactions — use `btrfs-assistant` or `snapper create` before risky changes. (A `libdnf5-plugin-actions` workaround exists; see Fedora Discussion.) Create the configs if the installer didn't:
 
 Skip if the installer already made it, since it errors when the config exists:
 
