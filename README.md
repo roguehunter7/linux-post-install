@@ -277,20 +277,6 @@ gnome-extensions enable bluetooth-quick-connect@bjarosze.gmail.com
 
 ## Fonts
 
-[Optional — skip on HiDPI/Wayland, Fedora defaults are fine.] Sub-pixel RGB rendering with the LCD filter, then rebuild the cache:
-
-```bash
-sudo ln -sf /usr/share/fontconfig/conf.avail/10-sub-pixel-rgb.conf /etc/fonts/conf.d/10-sub-pixel-rgb.conf
-```
-
-```bash
-sudo ln -sf /usr/share/fontconfig/conf.avail/11-lcdfilter-default.conf /etc/fonts/conf.d/11-lcdfilter-default.conf
-```
-
-```bash
-sudo fc-cache -f
-```
-
 Metric-compatible fonts (same layout as Arial, Times, Courier, Calibri, Cambria — no EULA):
 
 ```bash
