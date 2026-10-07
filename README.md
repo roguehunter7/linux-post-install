@@ -259,10 +259,10 @@ These two aren't in the Fedora repos. Install them from extensions.gnome.org wit
 sudo dnf install -y gnome-extensions-app
 ```
 
-Open it, search for **Clipboard History** and **Bluetooth Quick Connect**, install them, and toggle them on. (Log out and back in if they don't appear.) Or enable them from a terminal:
+Open it, search for **Clipboard Indicator** and **Bluetooth Quick Connect**, install them, and toggle them on. (Log out and back in if they don't appear.) Or enable them from a terminal:
 
 ```bash
-gnome-extensions enable clipboard-history@alexsaveau.dev
+gnome-extensions enable clipboard-indicator@tudmotu.com
 ```
 
 ```bash
