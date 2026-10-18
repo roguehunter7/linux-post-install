@@ -224,12 +224,6 @@ NTSYNC is loaded by CachyOS even without a gaming stack. It is harmless; no acti
 
 ## 9. Optional applications
 
-Repository packages:
-
-```bash
-shelly install standard yt-dlp nvme-cli
-```
-
 Wayland clipboard:
 
 ```bash
