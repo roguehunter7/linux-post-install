@@ -1,486 +1,345 @@
-# Fedora Workstation (GNOME) Post Install Guide
+# CachyOS Post-Install: ASUS VivoBook X409DA
 
-Things to do after installing Fedora Workstation (GNOME). Written for an ASUS VivoBook X409DA (AMD Ryzen 5 3500U / Vega 8, NVMe, Btrfs); most steps suit any Fedora GNOME machine.
+The CachyOS installer already handled KDE Plasma, systemd-boot, ext4, the x86-64-v3 repositories, and zram. This guide starts after first boot and covers only post-install changes. Package installs use Shelly, which prompts for authentication when needed.
 
-Run top to bottom. Each block is copy-paste into a terminal. Reboot where told. Graphics, session, and kernel changes need it.
+Hardware: Ryzen 5 3500U, Vega 8, 5.7 GiB usable RAM, 235 GB NVMe, ASUS VivoBook X409DA.
+Assumptions: Secure Boot is off, the laptop stays plugged in, and there is no gaming or low-latency audio workload.
+Last verified: 2026-10-18.
 
-## DNF tuning
+## 1. Update
 
-Speed up dnf before the first upgrade (10 parallel downloads, assume yes):
-
-```bash
-sudo dnf config-manager setopt max_parallel_downloads=10 defaultyes=True
-```
-
-Check it (should print `max_parallel_downloads = 10` and `defaultyes = 1`):
+Use Cachy-Update, the CachyOS update app, for normal package updates. Open it from the app menu or run:
 
 ```bash
-dnf --dump-main-config | grep -E '^(max_parallel_downloads|defaultyes)'
+cachy-update
 ```
 
-## Update
+It runs the full upgrade, shows Arch news, and offers post-update cleanup. For a terminal upgrade, use `shelly upgrade standard`.
 
-Update everything first, then reboot:
+Reboot if the update includes a kernel, Plasma, or GPU stack change.
+
+## 2. Kernel fallback
+
+The default `linux-cachyos` kernel is already installed. Open CachyOS Kernel Manager (`cachyos-kernel-manager`), select `linux-cachyos-lts`, and apply. It installs the kernel and regenerates the systemd-boot entries.
+
+For a terminal install, use Shelly:
 
 ```bash
-sudo dnf upgrade --refresh -y
-sudo systemctl reboot
+shelly install standard linux-cachyos-lts
 ```
 
-## RPM Fusion
-
-Fedora leaves out non-free software (codecs, drivers, firmware) by default. Enable RPM Fusion:
+If the entries are not updated, run:
 
 ```bash
-sudo dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+sudo sdboot-manage gen
 ```
+
+If `sdboot-manage` is missing, install its package first:
 
 ```bash
-sudo dnf upgrade --refresh -y
+shelly install standard systemd-boot-manager
 ```
 
-Show RPM Fusion apps in GNOME Software:
+Keep the default kernel as the normal boot target. The LTS build covers a bad kernel update. RT, BORE, BMQ, and RC builds target other workloads.
+
+## 3. Security
+
+UFW is enabled by default. Check it, then remove the KDE Connect firewall rules if KDE Connect is unused:
 
 ```bash
-sudo dnf install 'rpmfusion-*-appstream-data'
+sudo ufw status verbose
+systemctl is-enabled sshd
 ```
 
-Enable the Cisco OpenH264 repo (Firefox uses it for WebRTC calls):
+Check whether KDE Connect is installed:
 
 ```bash
-sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1
+pacman -Q kdeconnect
 ```
 
-## Multimedia
-
-Full ffmpeg instead of the stripped `ffmpeg-free`, plus the codec complements for GStreamer apps (straight from the [RPMFusion docs](https://rpmfusion.org/Howto/Multimedia)):
+If it is installed, remove it with Shelly. Shelly cascades unneeded dependencies by default:
 
 ```bash
-sudo dnf swap ffmpeg-free ffmpeg --allowerasing || sudo dnf install -y ffmpeg
+shelly remove standard kdeconnect
 ```
+
+If those UFW rules exist, remove them:
 
 ```bash
-sudo dnf install @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+sudo ufw delete allow 1714:1764/udp
+sudo ufw delete allow 1714:1764/tcp
+sudo ufw reload
 ```
 
-AMD hardware decode (H.264/H.265/VC-1 on this Vega 8 — stock Mesa leaves these out):
+If direct deletion fails, list them with `sudo ufw status numbered` and delete the two KDE Connect entries by number, highest first.
+
+The SSH server should stay disabled. If you enable it later, use key authentication and limit the port:
 
 ```bash
-sudo dnf install -y mesa-va-drivers-freeworld
+sudo systemctl enable --now sshd
+sudo ufw limit ssh
 ```
+
+Shelly is the default package manager; use it for AUR packages.
+
+## 4. Power and battery
+
+The active power profile should be `balanced`:
 
 ```bash
-sudo dnf swap mesa-vulkan-drivers mesa-vulkan-drivers-freeworld || sudo dnf install -y mesa-vulkan-drivers-freeworld
+powerprofilesctl get
 ```
 
-If you play 32-bit Steam/Wine games, add the i686 freeworld packages too:
+Use power-profiles-daemon; TLP is not part of this setup. The 3500U is Zen+ without CPPC, so it uses `acpi-cpufreq` with `schedutil`; `amd_pstate` does not apply.
+
+Check the battery thresholds:
 
 ```bash
-sudo dnf install -y mesa-va-drivers-freeworld.i686
+upower -i /org/freedesktop/UPower/devices/battery_BAT0 | grep -Ei 'threshold|capacity|state'
 ```
 
-## [Optional] Gaming (Steam)
-
-Steam comes from RPM Fusion (already enabled). Installing it pulls in `ntsync-autoload` — which loads the kernel's NTSYNC module at boot, used automatically by Wine 11 / Proton — plus `gamemode` and the 32-bit bits, as weak dependencies:
+Set an 80% charge limit in KDE System Settings under Power Management. If the UI does not expose it, set it directly:
 
 ```bash
-sudo dnf install -y steam
+echo 80 | sudo tee /sys/class/power_supply/BAT0/charge_control_end_threshold
 ```
 
-Reboot (or run `sudo modprobe ntsync`) and `/dev/ntsync` will exist. Steam only pulls `ntsync-autoload` through *weak* dependencies, so if anything was installed with `--setopt=install_weak_deps=False`, add it explicitly:
+To make the sysfs method persistent:
 
 ```bash
-sudo dnf install -y ntsync-autoload
+printf 'w /sys/class/power_supply/BAT0/charge_control_end_threshold - - - - 80\n' | sudo tee /etc/tmpfiles.d/battery-charge-limit.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/battery-charge-limit.conf
 ```
 
-## Firmware
+Use either the KDE/UPower control or the tmpfiles file, not both. This battery is at about 65% health after 335 cycles; 80% is a reasonable limit for a laptop that stays plugged in. The 3500U is 4C/8T, so `game-performance` is not part of this setup.
 
-If your system supports firmware delivery through LVFS:
+## 5. Filesystem and backups
+
+The installer already mounts ext4 with `noatime`. Confirm it after first boot:
 
 ```bash
-fwupdmgr refresh --force
+findmnt -no FSTYPE,OPTIONS /
+systemctl is-enabled fstrim.timer
+sudo systemctl enable --now fstrim.timer
 ```
+
+Expected: `ext4` with `noatime` in the options, and `fstrim.timer` enabled. No `/etc/fstab` edit is needed.
+
+This setup has no snapshots. Use restic or borg to back up to an external disk:
 
 ```bash
-fwupdmgr get-devices
+shelly install standard restic
 ```
 
-Lists devices with available updates.
+Initialize the repository on the external disk and follow the restic documentation. The package cache and `shelly downgrade` handle package rollback, but they are not a substitute for a backup.
+
+## 6. Maintenance
+
+Clean the package cache and keep the last three versions:
 
 ```bash
-fwupdmgr get-updates
+shelly install standard pacman-contrib
+sudo paccache -r -k3
+sudo systemctl enable --now paccache.timer
 ```
 
-Fetches the list of available updates.
+Shelly can perform the same cleanup on demand:
 
 ```bash
-fwupdmgr update
+shelly purify standard -c 3
 ```
 
-## Flatpak
-
-Enable access to all Flathub flatpaks (skip if you ticked "Enable Third Party Repositories" on first boot):
+Use one method. Enable SMART monitoring:
 
 ```bash
-flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+shelly install standard smartmontools
+sudo systemctl enable --now smartd.service
+sudo smartctl -a /dev/nvme0n1
 ```
 
-## Extra apps
-
-Compilers and build tools as a group:
-
-```bash
-sudo dnf group install -y development-tools
-```
-
-This installs the extra apps. Workstation already ships GNOME Shell, Nautilus, Ptyxis, GNOME Text Editor, and PipeWire, so those are not listed. `nss-mdns` below covers `.local` discovery (it pulls in Avahi itself). Niche extras are left out; install them from GNOME Software when you need them.
-
-```bash
-sudo dnf install -y gnome-tweaks gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock file-roller python3-pip python3-virtualenv java-latest-openjdk-devel golang mesa-dri-drivers vulkan-tools libva libva-utils dav1d libheif libavif libjxl libwebp mpv pipewire-pulseaudio pipewire-alsa alsa-sof-firmware alsa-ucm alsa-utils bluez firefox qbittorrent libreoffice 7zip unzip xdg-user-dirs cups snapper btrfs-assistant btrfsmaintenance easyeffects lsp-plugins calf smartmontools nvme-cli zram-generator flatpak fwupd nss-mdns openssh rsync dosfstools mtools usbutils unrar yt-dlp zsh
-```
-
-## Battery charge limit (60%) [ASUS-only]
-
-[ASUS VivoBook X409DA only — skip on other machines.] This ASUS exposes charge control directly, so no TLP is needed. Stop charging at 60% to slow battery wear. Skip if the path below does not exist:
-
-```bash
-[ -e /sys/class/power_supply/BAT0/charge_control_end_threshold ] && echo 60 | sudo tee /sys/class/power_supply/BAT0/charge_control_end_threshold || echo "no BAT0 charge control — skipping"
-```
-
-Make it survive reboots (ASUS-only — skip if the path above does not exist):
-
-```bash
-[ -e /sys/class/power_supply/BAT0/charge_control_end_threshold ] && printf 'w /sys/class/power_supply/BAT0/charge_control_end_threshold - - - - 60\n' | sudo tee /etc/tmpfiles.d/battery-charge-limit.conf >/dev/null || echo "no BAT0 charge control — skipping"
-```
-
-Check it (should print `60`):
-
-```bash
-[ -e /sys/class/power_supply/BAT0/charge_control_end_threshold ] && cat /sys/class/power_supply/BAT0/charge_control_end_threshold || echo "no BAT0 charge control — skipping"
-```
-
-## Shell (zsh + Starship)
-
-Make zsh the login shell, install the Starship prompt upstream (no Fedora package), and add the shell setup block:
-
-```bash
-chsh -s $(command -v zsh)
-```
-
-```bash
-curl -sS https://starship.rs/install.sh | sh -s -- -y
-```
-
-Append this base block to `~/.zshrc`. It is guarded, so re-running is safe. It needs nothing beyond zsh + Starship:
-
-```zsh
-# BEGIN SETUP BLOCK
-export PATH="$HOME/.local/bin:$PATH"
-autoload -U compinit
-compinit
-setopt COMPLETE_IN_WORD
-HISTFILE=~/.zsh_history
-HISTSIZE=10000
-SAVEHIST=10000
-setopt appendhistory
-setopt SHARE_HISTORY
-setopt autocd
-unsetopt nomatch
-eval "$(starship init zsh)"
-bindkey "^[[1;5D" backward-word
-bindkey "^[[1;5C" forward-word
-bindkey '^H' backward-kill-word
-bindkey '^[[3;5~' kill-word
-bindkey "^[[3~" delete-char
-bindkey '^[[H' beginning-of-line
-bindkey '^[[F' end-of-line
-# END SETUP BLOCK
-```
-
-[Optional — only if you did the Node.js (fnm) section and want the plugins.] First install the plugins, then append this second block:
-
-```bash
-sudo dnf install -y zsh-autosuggestions fzf zsh-syntax-highlighting
-```
-
-```zsh
-# BEGIN OPTIONAL BLOCK (fnm + plugins)
-export PATH="$HOME/.local/share/fnm:$PATH"
-if command -v fnm >/dev/null 2>&1; then
-    eval "$(fnm env --use-on-cd --resolve-engines --shell zsh)"
-fi
-[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-[ -f /usr/share/fzf/shell/key-bindings.zsh ] && source /usr/share/fzf/shell/key-bindings.zsh
-[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-# END OPTIONAL BLOCK
-```
-
-## Node.js (fnm) [Optional]
-
-Fedora ships no `fnm` package, so install it upstream, then take the latest Node:
-
-```bash
-curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell
-```
-
-```bash
-export PATH="$HOME/.local/share/fnm:$PATH" && eval "$(fnm env --shell bash)" && fnm install --latest && fnm default $(fnm ls | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1)
-```
-
-## GNOME polish
-
-Dark theme, volume overamplification (up to 150%), three window buttons, two-finger touchpad scrolling, and quietening GNOME Software:
-
-```bash
-gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
-```
-
-```bash
-gsettings set org.gnome.desktop.sound allow-volume-above-100-percent true
-```
-
-```bash
-gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close'
-```
-
-```bash
-gsettings set org.gnome.desktop.peripherals.touchpad two-finger-scrolling-enabled true
-```
-
-Stop GNOME Software's background updates and search provider [Optional — you lose background updates; GNOME Software still updates when you open it]:
-
-```bash
-systemctl --user mask gnome-software.service
-```
-
-```bash
-gsettings set org.gnome.desktop.search-providers disabled "['org.gnome.Software.desktop']"
-```
-
-Enable the extensions installed above (AppIndicator for tray icons, Dash to Dock):
-
-```bash
-gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
-```
-
-```bash
-gnome-extensions enable dash-to-dock@micxgx.gmail.com
-```
-
-## [Optional] Extensions (catalog)
-
-These two aren't in the Fedora repos. Install them from extensions.gnome.org with the Extensions app — it checks GNOME version compatibility and handles updates:
-
-```bash
-sudo dnf install -y gnome-extensions-app
-```
-
-Open it, search for **Clipboard Indicator** and **Bluetooth Quick Connect**, install them, and toggle them on. (Log out and back in if they don't appear.) Or enable them from a terminal:
-
-```bash
-gnome-extensions enable clipboard-indicator@tudmotu.com
-```
-
-```bash
-gnome-extensions enable bluetooth-quick-connect@bjarosze.gmail.com
-```
-
-## Fonts
-
-Metric-compatible fonts (same layout as Arial, Times, Courier, Calibri, Cambria — no EULA):
-
-```bash
-sudo dnf install -y liberation-sans-fonts liberation-serif-fonts liberation-mono-fonts google-carlito-fonts google-crosextra-caladea-fonts
-```
-
-Real Microsoft fonts [Optional]:
-
-```bash
-sudo dnf install -y lpf-mscore-fonts
-```
-
-Then follow the prompts (approves the EULA, downloads from SourceForge, builds and installs a local RPM):
-
-```bash
-lpf update mscore-fonts
-```
-
-## System tuning
-
-Cap the journal at 200M:
-
-```bash
-sudo mkdir -p /etc/systemd/journald.conf.d && printf '[Journal]\nSystemMaxUse=200M\nSystemMaxFiles=5\nSyncIntervalSec=5m\n' | sudo tee /etc/systemd/journald.conf.d/99-ssd.conf >/dev/null && sudo systemctl restart systemd-journald
-```
-
-zstd compression for zram (Fedora defaults to lzo-rle; keep the default size, only switch the algorithm):
-
-```bash
-printf '[zram0]\ncompression-algorithm = zstd\n' | sudo tee /etc/systemd/zram-generator.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl start systemd-zram-setup@zram0.service
-```
-
-Kernel and memory sysctls (aggressive swap into zram, Proton map count, inotify capacity):
-
-```bash
-sudo mkdir -p /etc/sysctl.d && printf 'vm.swappiness = 180\nvm.page-cluster = 0\nvm.watermark_boost_factor = 0\nvm.watermark_scale_factor = 125\nvm.max_map_count = 1048576\nvm.vfs_cache_pressure = 50\nfs.inotify.max_user_watches = 524288\nfs.inotify.max_user_instances = 8192\n' | sudo tee /etc/sysctl.d/99-performance.conf >/dev/null && sudo sysctl --system
-```
-
-Skip the boot-delaying waiter:
+The network wait service is optional on a laptop with no network mounts:
 
 ```bash
 sudo systemctl disable NetworkManager-wait-online.service
 ```
 
-## Firewall
+It runs in parallel with the desktop, so disabling it may not change time-to-desktop.
 
-Fedora ships `firewalld`. Use it and don't install `ufw` alongside it:
+## 7. Boot timeout
+
+The systemd-boot timeout is usually five seconds. Back up the loader config, check the timeout, and set it to two:
 
 ```bash
-sudo systemctl enable --now firewalld
+sudo cp /boot/loader/loader.conf /boot/loader/loader.conf.bak
+sudo grep -nE '^timeout[[:space:]]' /boot/loader/loader.conf
+sudo sed -i -E 's/^timeout[[:space:]].*/timeout 2/' /boot/loader/loader.conf
 ```
 
-## Btrfs
+If there is no `timeout` line, add `timeout 2` at the top with `sudoedit /boot/loader/loader.conf`. The new timeout applies at the next boot.
 
-The installer already sets `compress=zstd:1` on `/` and `/home`. Add `noatime` to Btrfs lines missing it (safe to re-run), then verify:
+Check boot space after installing the LTS kernel:
 
 ```bash
-sudo sed -i -E '/[[:space:]]btrfs[[:space:]]/ { /noatime/! s/(btrfs +)([^ ]+)/\1noatime,\2/; }' /etc/fstab
+df -h /boot
 ```
 
-Must pass before rebooting:
+Run `sudo sdboot-manage gen` after any kernel or initramfs change.
+
+## 8. Desktop and hardware
+
+KDE Plasma runs on Wayland with fish as the login shell. Baloo is disabled by CachyOS; leave it that way unless you need file search indexing.
+
+Check the GPU stack:
 
 ```bash
-sudo findmnt --verify
-```
-
-`fstrim.timer` (enabled below) stays for `/boot`, which is ext4. The Btrfs mounts discard async on their own.
-
-## Snapshots
-
-Snapper takes timeline snapshots (via `snapper-timeline.timer`, enabled below). Note: Fedora 44's default `dnf` is dnf5, which cannot load the dnf4 `python3-dnf-plugin-snapper`, so there are **no automatic pre/post snapshots** on dnf transactions — use `btrfs-assistant` or `snapper create` before risky changes. (A `libdnf5-plugin-actions` workaround exists; see Fedora Discussion.) Create the configs if the installer didn't:
-
-Skip if the installer already made it, since it errors when the config exists:
-
-```bash
-sudo snapper -c root create-config /
-```
-
-```bash
-sudo snapper -c home create-config /home
-```
-
-Monthly scrubs are covered by `btrfs-scrub.timer` (enabled below).
-
-`grub-btrfs` is not in the Fedora repos, so there is no GRUB snapshot menu. Restore from a live USB if needed.
-
-## Boot
-
-Microcode ships via `linux-firmware`. No action is needed.
-
-2s GRUB timeout:
-
-```bash
-sudo sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=2/' /etc/default/grub && sudo grub2-mkconfig -o /boot/grub2/grub.cfg
-```
-
-## Sudo feedback
-
-Show `*` while typing the sudo password:
-
-```bash
-echo 'Defaults pwfeedback' | sudo tee /etc/sudoers.d/pwfeedback >/dev/null && sudo chmod 0440 /etc/sudoers.d/pwfeedback
-```
-
-## Services
-
-Enable everything in one go (the rest — display manager, NetworkManager, firewalld, Bluetooth, printing, trim, smartd, Avahi — ships enabled):
-
-```bash
-sudo systemctl enable snapper-timeline.timer snapper-cleanup.timer btrfs-scrub.timer fwupd-refresh.timer
-```
-
-```bash
-sudo systemctl reboot
-```
-
-## Verify after reboot
-
-VA-API on Vega 8:
-
-```bash
+shelly install standard libva-utils vulkan-tools
 vainfo
-```
-
-RADV Vulkan:
-
-```bash
 vulkaninfo --summary
 ```
 
-Compressed swap:
+Mesa, RADV, and VA-API are included in the normal repositories.
+
+Add metric-compatible fonts:
 
 ```bash
+shelly install standard ttf-liberation ttf-carlito ttf-caladea
+```
+
+Flatpak already has the Flathub remote; check it with `flatpak remotes`. No `remote-add` is needed.
+
+Printing is optional:
+
+```bash
+shelly install standard cups print-manager
+sudo systemctl enable --now cups.socket
+```
+
+Dolphin uses Ark for archive handling. Ark covers ZIP and TAR through libarchive and libzip; add 7zip and unrar for 7z and RAR:
+
+```bash
+shelly install standard 7zip unrar
+```
+
+NTSYNC is loaded by CachyOS even without a gaming stack. It is harmless; no action is needed.
+
+## 9. Optional applications
+
+Repository packages:
+
+```bash
+shelly install standard yt-dlp nvme-cli
+```
+
+Wayland clipboard:
+
+```bash
+shelly install standard wl-clipboard
+```
+
+Node.js, if needed. The repos carry the current Node release and npm:
+
+```bash
+shelly install standard nodejs npm
+```
+
+For multiple Node versions or a newer upstream release than the repos carry, install `fnm` with Shelly:
+
+```bash
+shelly install standard fnm
+```
+
+Build tools:
+
+```bash
+shelly install standard base-devel gcc clang cmake ninja meson
+```
+
+Python, current from the repos:
+
+```bash
+shelly install standard python python-pip python-virtualenv
+```
+
+Go:
+
+```bash
+shelly install standard go
+```
+
+Java, if needed:
+
+```bash
+shelly install standard jdk-openjdk
+```
+
+Zed:
+
+```bash
+shelly install standard zed
+```
+
+Audio tools, if needed:
+
+```bash
+shelly install standard easyeffects lsp-plugins calf
+```
+
+AUR packages use Shelly:
+
+```bash
+shelly install aur ttf-ms-fonts
+```
+
+The Microsoft fonts package requires accepting its EULA.
+
+If the gaming stack is installed, remove the metapackages and Steam with Shelly. The default cascade removes dependencies that nothing else needs, including 7zip, Wine, and the launchers if only the gaming stack used them:
+
+```bash
+shelly remove standard cachyos-gaming-applications cachyos-gaming-meta
+shelly remove standard steam
+```
+
+## 10. Verify
+
+```bash
+uname -r
+grep -E '^\[cachyos-(v3|core-v3|extra-v3)\]' /etc/pacman.conf
+vainfo
+vulkaninfo --summary
 zramctl
+findmnt -no FSTYPE,OPTIONS /
+systemctl is-enabled fstrim.timer
+sudo bootctl status
+sudo ufw status verbose
+systemctl --failed
+powerprofilesctl get
+upower -i /org/freedesktop/UPower/devices/battery_BAT0 | grep -Ei 'threshold|capacity'
+df -h /boot
+shelly list-updates
 ```
 
-Btrfs mount options:
+Expected: the default CachyOS kernel with the LTS fallback installed, v3 repositories, working VA-API and Vulkan, zram swap, ext4 on `/` with `noatime`, `fstrim.timer` enabled, systemd-boot active, UFW active, no failed units, an 80% battery limit, and free space in `/boot`.
+
+## 11. Recovery
+
+This setup has no bootable snapshots. Boot a CachyOS live USB, or restore from the external restic or borg backup.
+
+For package rollback, use Shelly:
 
 ```bash
-findmnt /
+shelly downgrade
 ```
 
-Firewall running:
+The pacman cache keeps the last three versions. List the exact filename before a manual install:
 
 ```bash
-firewall-cmd --state
+ls /var/cache/pacman/pkg/ | grep '^linux-cachyos'
 ```
 
-[ASUS-only] `60` = limit active:
+If the system will not boot, use a CachyOS live USB and its `cachy-chroot` helper. Install the `cachy-chroot` package in the live session if it is missing.
 
-```bash
-[ -e /sys/class/power_supply/BAT0/charge_control_end_threshold ] && cat /sys/class/power_supply/BAT0/charge_control_end_threshold || echo "no BAT0 charge control — skipping"
-```
-
-Pre/post snapshots:
-
-```bash
-sudo snapper list
-```
-
-SELinux enforcing:
-
-```bash
-getenforce
-```
-
-Node.js through fnm:
-
-```bash
-node -v
-```
-
-Latest OpenJDK SDK:
-
-```bash
-java --version
-```
-
-`/usr/bin/zsh` after re-login:
-
-```bash
-echo $SHELL
-```
+Hibernation is not configured because swap is zram only. To enable it, add a swapfile or swap partition and configure resume; zram cannot hibernate.
 
 ## Notes
 
-**Rollback** is native:
-
-```bash
-sudo dnf history rollback
-```
-
-```bash
-sudo dnf downgrade '<pkg>-<ver>'
-```
-
-**Hibernation is not configured** — swap is zram only.
+The installer already configured KDE, systemd-boot, ext4, the v3 repositories, and zram. This guide covers only the changes worth making after first boot. CachyOS is rolling; re-check package names and defaults after major updates.
